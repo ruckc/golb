@@ -45,10 +45,16 @@ func (s *ServerPool) GetNextPeer(ctx context.Context) *Backend {
 			return backend
 		}
 
-		waitCh := make(chan struct{})
+		// Wait for a backend to become available or context cancellation
+		// Removed unused waitCh variable
+
+		// Wait for backendAvailable or context done
+		waitDone := make(chan struct{})
 		go func() {
+			s.mu.Lock()
 			s.backendAvailable.Wait()
-			close(waitCh)
+			s.mu.Unlock()
+			close(waitDone)
 		}()
 
 		s.mu.Unlock()
@@ -56,7 +62,7 @@ func (s *ServerPool) GetNextPeer(ctx context.Context) *Backend {
 		case <-ctx.Done():
 			s.mu.Lock()
 			return nil
-		case <-waitCh:
+		case <-waitDone:
 			s.mu.Lock()
 		}
 	}
