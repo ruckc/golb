@@ -1,8 +1,10 @@
 package golb
 
 import (
+	"context"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -10,14 +12,19 @@ import (
 type ServerPool struct {
 	backends []*Backend
 	lb       LoadBalancer
+
+	mu               sync.Mutex
+	backendAvailable *sync.Cond
 }
 
 // NewServerPool creates a new ServerPool with a specific load balancing strategy
 func NewServerPool(lbStrategy LoadBalancer) *ServerPool {
-	return &ServerPool{
+	pool := &ServerPool{
 		backends: []*Backend{},
 		lb:       lbStrategy,
 	}
+	pool.backendAvailable = sync.NewCond(&pool.mu)
+	return pool
 }
 
 // AddBackend adds a new backend server to the pool
@@ -26,9 +33,33 @@ func (s *ServerPool) AddBackend(b *Backend) {
 }
 
 // GetNextPeer selects the next available backend using the configured strategy
-func (s *ServerPool) GetNextPeer() *Backend {
-	// Delegate selection to the load balancer strategy
-	return s.lb.SelectBackend(s.backends)
+// It blocks and waits for an available backend if none are currently alive.
+// It returns nil if the context is canceled or times out.
+func (s *ServerPool) GetNextPeer(ctx context.Context) *Backend {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for {
+		backend := s.lb.SelectBackend(s.backends)
+		if backend != nil {
+			return backend
+		}
+
+		waitCh := make(chan struct{})
+		go func() {
+			s.backendAvailable.Wait()
+			close(waitCh)
+		}()
+
+		s.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			s.mu.Lock()
+			return nil
+		case <-waitCh:
+			s.mu.Lock()
+		}
+	}
 }
 
 // MarkBackendStatus updates the Alive status of a specific backend by URL
@@ -37,9 +68,16 @@ func (s *ServerPool) MarkBackendStatus(backendURL *url.URL, alive bool) {
 		return
 	}
 	targetURLStr := backendURL.String()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, b := range s.backends {
 		if b.URL.String() == targetURLStr {
+			previousAlive := b.IsAlive()
 			b.SetAlive(alive)
+			if !previousAlive && alive {
+				// Notify waiters that a backend became available
+				s.backendAvailable.Broadcast()
+			}
 			return
 		}
 	}

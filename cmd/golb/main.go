@@ -120,10 +120,10 @@ func main() {
 	log.Println("Initial health check complete.")
 
 	// Ensure at least one valid backend was added
-	if pool.GetNextPeer() == nil && len(cfg.BackendServers) > 0 {
-		// This checks if AddBackend was never called successfully or if all initial backends fail parsing
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if pool.GetNextPeer(ctx) == nil && len(cfg.BackendServers) > 0 {
 		log.Fatal("Error: No valid backend servers were successfully configured.")
-		// Or if the pool has backends, but none are initially selectable (e.g., all marked down somehow before first healthcheck - unlikely here)
 	} else if len(cfg.BackendServers) == 0 {
 		log.Fatal("Error: No backend servers defined in configuration.") // Should be caught by LoadConfig, but double check
 	}
@@ -174,7 +174,7 @@ func main() {
 	<-quit
 	log.Println("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Allow 30 seconds for graceful shutdown
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second) // Allow 30 seconds for graceful shutdown
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {

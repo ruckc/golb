@@ -14,7 +14,7 @@ func Lb(w http.ResponseWriter, r *http.Request, pool *ServerPool) {
 	// Accurate tracking often requires wrapping http.ResponseWriter or Transport.
 	// var selectedPeer *Backend // Keep track if needed for decrement later
 
-	peer := pool.GetNextPeer()
+	peer := pool.GetNextPeer(r.Context())
 	if peer == nil {
 		log.Printf("Service Unavailable: No healthy backends available for request %s %s", r.Method, r.URL.Path)
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
