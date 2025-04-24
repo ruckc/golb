@@ -8,7 +8,7 @@ import (
 )
 
 // performHealthCheckCycle runs one round of health checks for all backends
-func (s *ServerPool) performHealthCheckCycle(client *http.Client, cfg *Config) {
+func (s *ServerPool) PerformHealthCheckCycle(client *http.Client, cfg *Config) {
 	log.Println("Performing health checks...")
 	for _, b := range s.backends {
 		// Perform check and get duration
@@ -50,7 +50,7 @@ func isBackendAlive(client *http.Client, b *Backend, healthCheckPath string) (bo
 
 	if err != nil {
 		// Network errors mean it's down
-		// log.Printf("Health check failed for %s: %v\n", b.URL, err) // Can be noisy
+		log.Printf("Health check failed for %s: %v\n", b.URL, err) // Can be noisy
 		return false, duration
 	}
 	defer func() {
@@ -63,7 +63,7 @@ func isBackendAlive(client *http.Client, b *Backend, healthCheckPath string) (bo
 
 	// Any status other than 200 OK means unhealthy
 	if resp.StatusCode != http.StatusOK {
-		// log.Printf("Health check non-OK for %s: Status %d\n", b.URL, resp.StatusCode) // Can be noisy
+		log.Printf("Health check non-OK for %s: Status %d\n", b.URL, resp.StatusCode) // Can be noisy
 		return false, duration
 	}
 

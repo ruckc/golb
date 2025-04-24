@@ -54,14 +54,11 @@ func (s *ServerPool) HealthCheck(cfg *Config) {
 		// Transport: &http.Transport{ DisableKeepAlives: true },
 	}
 
-	// Perform initial check immediately
-	s.performHealthCheckCycle(client, cfg)
-
 	// Start ticker for subsequent checks
 	ticker := time.NewTicker(cfg.HealthCheckInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		s.performHealthCheckCycle(client, cfg)
+		s.PerformHealthCheckCycle(client, cfg)
 	}
 }

@@ -109,6 +109,16 @@ func main() {
 		log.Printf("Configured backend: %s (Weight: %d)", backendAddr, weight)
 	}
 
+	// --- Initial Health Check (Synchronous) ---
+	log.Println("Performing initial health check...")
+	// Create a client specifically for this initial check
+	initialCheckClient := &http.Client{
+		Timeout: cfg.BackendRequestTimeout, // Use configured timeout
+	}
+	// Call performHealthCheckCycle directly (it's defined in health.go but accessible via pool)
+	pool.PerformHealthCheckCycle(initialCheckClient, cfg) // You need to expose performHealthCheckCycle or call it via HealthCheck differently
+	log.Println("Initial health check complete.")
+
 	// Ensure at least one valid backend was added
 	if pool.GetNextPeer() == nil && len(cfg.BackendServers) > 0 {
 		// This checks if AddBackend was never called successfully or if all initial backends fail parsing
