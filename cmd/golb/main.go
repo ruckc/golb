@@ -146,7 +146,7 @@ func main() {
 		// to accurately track connection start/end for LeastConnections.
 		// E.g., peer := pool.GetNextPeer(); if peer != nil { peer.Increment... }
 		//       defer peer.Decrement...
-		golb.Lb(w, r, pool)
+		golb.Lb(w, r, pool, cfg.AccessLogEnabled, cfg.AccessLogPayloads)
 	})
 
 	// Configure the server

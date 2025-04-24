@@ -34,6 +34,9 @@ type Config struct {
 	LoadBalancingAlgorithm string        `yaml:"loadBalancingAlgorithm"`
 	EWMAAlpha              float64       `yaml:"ewmaAlpha"` // For Least Response Time
 
+	AccessLogEnabled  bool `yaml:"accessLogEnabled"`  // Enable access logging
+	AccessLogPayloads bool `yaml:"accessLogPayloads"` // Enable logging of request/response payloads
+
 	// Internal field, not loaded from yaml/env
 	ConfigFile string `yaml:"-"`
 }
@@ -50,6 +53,8 @@ func DefaultConfig() *Config {
 		BackendRequestTimeout:  2 * time.Second,
 		LoadBalancingAlgorithm: DefaultLBAlgorithm,
 		EWMAAlpha:              DefaultEWMAAlpha,
+		AccessLogEnabled:       false,
+		AccessLogPayloads:      false,
 		ConfigFile:             "",
 	}
 }
@@ -70,6 +75,8 @@ func LoadConfig() (*Config, error) {
 	flagConfigFile := flag.String("config", cfg.ConfigFile, "Path to YAML configuration file")
 	flagLBAlgo := flag.String("lb-algo", cfg.LoadBalancingAlgorithm, "Load balancing algorithm: round-robin, least-connections, least-response-time, weighted-round-robin (Env: "+EnvPrefix+"LB_ALGORITHM)")
 	flagEWMAAlpha := flag.Float64("ewma-alpha", cfg.EWMAAlpha, "EWMA smoothing factor (0 < alpha <= 1) for least-response-time (Env: "+EnvPrefix+"EWMA_ALPHA)")
+	flagAccessLogEnabled := flag.Bool("access-log-enabled", cfg.AccessLogEnabled, "Enable access logging (Env: "+EnvPrefix+"ACCESS_LOG_ENABLED)")
+	flagAccessLogPayloads := flag.Bool("access-log-payloads", cfg.AccessLogPayloads, "Enable logging of request and response payloads (Env: "+EnvPrefix+"ACCESS_LOG_PAYLOADS)")
 
 	// Parse flags early to potentially get the config file path
 	flag.Parse()
@@ -89,7 +96,7 @@ func LoadConfig() (*Config, error) {
 
 	// --- Apply Command Line Flags (Highest Priority) ---
 	// Use flag.Visit to only apply flags that were actually set
-	applyFlags(cfg, flagProxyPort, flagBackendServers, flagBackendWeights, flagHealthPath, flagInfoPath, flagHealthInterval, flagBackendTimeout, flagConfigFile, flagLBAlgo, flagEWMAAlpha)
+	applyFlags(cfg, flagProxyPort, flagBackendServers, flagBackendWeights, flagHealthPath, flagInfoPath, flagHealthInterval, flagBackendTimeout, flagConfigFile, flagLBAlgo, flagEWMAAlpha, flagAccessLogEnabled, flagAccessLogPayloads)
 
 	// --- Final Validation ---
 	if len(cfg.BackendServers) == 0 || (len(cfg.BackendServers) == 1 && cfg.BackendServers[0] == "") {
@@ -171,7 +178,7 @@ func loadConfigFromEnv(cfg *Config) {
 }
 
 // applyFlags overwrites cfg fields if the corresponding flag was explicitly set on the command line
-func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, flagBackendWeights *string, flagHealthPath *string, flagInfoPath *string, flagHealthInterval *time.Duration, flagBackendTimeout *time.Duration, flagConfigFile *string, flagLBAlgo *string, flagEWMAAlpha *float64) {
+func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, flagBackendWeights *string, flagHealthPath *string, flagInfoPath *string, flagHealthInterval *time.Duration, flagBackendTimeout *time.Duration, flagConfigFile *string, flagLBAlgo *string, flagEWMAAlpha *float64, flagAccessLogEnabled *bool, flagAccessLogPayloads *bool) {
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "port":
@@ -199,6 +206,10 @@ func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, 
 			cfg.LoadBalancingAlgorithm = strings.ToLower(*flagLBAlgo)
 		case "ewma-alpha":
 			cfg.EWMAAlpha = *flagEWMAAlpha
+		case "access-log-enabled":
+			cfg.AccessLogEnabled = *flagAccessLogEnabled
+		case "access-log-payloads":
+			cfg.AccessLogPayloads = *flagAccessLogPayloads
 		}
 	})
 }
