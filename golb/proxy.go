@@ -2,7 +2,7 @@ package golb
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
@@ -33,16 +33,16 @@ func Lb(w http.ResponseWriter, r *http.Request, pool *ServerPool, accessLogEnabl
 			// Read and log request body
 			var reqBodyBytes []byte
 			if r.Body != nil {
-				reqBodyBytes, _ = ioutil.ReadAll(r.Body)
+				reqBodyBytes, _ = io.ReadAll(r.Body)
 				log.Printf("Request Body: %s", string(reqBodyBytes))
 				// Restore the io.ReadCloser to its original state
-				r.Body = ioutil.NopCloser(bytes.NewBuffer(reqBodyBytes))
+				r.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
 			}
 		}
 	}
 
 	// Wrap ResponseWriter to capture response body if payload logging enabled
-	var rw http.ResponseWriter = w
+	rw := w
 	var respBody *bytes.Buffer
 	if accessLogEnabled && accessLogPayloads {
 		respBody = &bytes.Buffer{}
@@ -51,7 +51,11 @@ func Lb(w http.ResponseWriter, r *http.Request, pool *ServerPool, accessLogEnabl
 
 	peer.ReverseProxy.ServeHTTP(rw, r)
 
-	if accessLogEnabled && accessLogPayloads && respBody != nil {
-		log.Printf("Response Body: %s", respBody.String())
+	if accessLogEnabled && accessLogPayloads {
+		if respBody != nil {
+			log.Printf("Response Body: %s", respBody.String())
+		} else {
+			log.Println("Response Body: <empty>")
+		}
 	}
 }

@@ -103,10 +103,6 @@ func (lrt *LeastResponseTimeBalancer) SelectBackend(backends []*Backend) *Backen
 			if selected == nil || (ewma > 0 && (minEwma <= 0 || ewma < minEwma)) || (ewma == 0 && minEwma > 0) {
 				selected = backend
 				minEwma = ewma
-			} else if ewma == 0 && minEwma == 0 && selected == nil {
-				// Handle first alive backend having 0 EWMA
-				selected = backend
-				minEwma = ewma
 			}
 		}
 	}

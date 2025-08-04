@@ -36,6 +36,7 @@ type Config struct {
 
 	AccessLogEnabled  bool `yaml:"accessLogEnabled"`  // Enable access logging
 	AccessLogPayloads bool `yaml:"accessLogPayloads"` // Enable logging of request/response payloads
+	DebugLevel        bool `yaml:"debugLevel"`        // Enable debug level logging
 
 	// Internal field, not loaded from yaml/env
 	ConfigFile string `yaml:"-"`
@@ -55,6 +56,7 @@ func DefaultConfig() *Config {
 		EWMAAlpha:              DefaultEWMAAlpha,
 		AccessLogEnabled:       false,
 		AccessLogPayloads:      false,
+		DebugLevel:             false,
 		ConfigFile:             "",
 	}
 }
@@ -77,6 +79,7 @@ func LoadConfig() (*Config, error) {
 	flagEWMAAlpha := flag.Float64("ewma-alpha", cfg.EWMAAlpha, "EWMA smoothing factor (0 < alpha <= 1) for least-response-time (Env: "+EnvPrefix+"EWMA_ALPHA)")
 	flagAccessLogEnabled := flag.Bool("access-log-enabled", cfg.AccessLogEnabled, "Enable access logging (Env: "+EnvPrefix+"ACCESS_LOG_ENABLED)")
 	flagAccessLogPayloads := flag.Bool("access-log-payloads", cfg.AccessLogPayloads, "Enable logging of request and response payloads (Env: "+EnvPrefix+"ACCESS_LOG_PAYLOADS)")
+	flagDebugLevel := flag.Bool("debug", cfg.DebugLevel, "Enable debug level logging (Env: "+EnvPrefix+"DEBUG)")
 
 	// Parse flags early to potentially get the config file path
 	flag.Parse()
@@ -96,7 +99,7 @@ func LoadConfig() (*Config, error) {
 
 	// --- Apply Command Line Flags (Highest Priority) ---
 	// Use flag.Visit to only apply flags that were actually set
-	applyFlags(cfg, flagProxyPort, flagBackendServers, flagBackendWeights, flagHealthPath, flagInfoPath, flagHealthInterval, flagBackendTimeout, flagConfigFile, flagLBAlgo, flagEWMAAlpha, flagAccessLogEnabled, flagAccessLogPayloads)
+	applyFlags(cfg, flagProxyPort, flagBackendServers, flagBackendWeights, flagHealthPath, flagInfoPath, flagHealthInterval, flagBackendTimeout, flagConfigFile, flagLBAlgo, flagEWMAAlpha, flagAccessLogEnabled, flagAccessLogPayloads, flagDebugLevel)
 
 	// --- Final Validation ---
 	if len(cfg.BackendServers) == 0 || (len(cfg.BackendServers) == 1 && cfg.BackendServers[0] == "") {
@@ -175,10 +178,31 @@ func loadConfigFromEnv(cfg *Config) {
 			log.Printf("Warning: Invalid format for env var %sEWMA_ALPHA: %v", EnvPrefix, err)
 		}
 	}
+	if accessLogStr := os.Getenv(EnvPrefix + "ACCESS_LOG_ENABLED"); accessLogStr != "" {
+		if accessLog, err := strconv.ParseBool(accessLogStr); err == nil {
+			cfg.AccessLogEnabled = accessLog
+		} else {
+			log.Printf("Warning: Invalid format for env var %sACCESS_LOG_ENABLED: %v", EnvPrefix, err)
+		}
+	}
+	if accessLogPayloadsStr := os.Getenv(EnvPrefix + "ACCESS_LOG_PAYLOADS"); accessLogPayloadsStr != "" {
+		if accessLogPayloads, err := strconv.ParseBool(accessLogPayloadsStr); err == nil {
+			cfg.AccessLogPayloads = accessLogPayloads
+		} else {
+			log.Printf("Warning: Invalid format for env var %sACCESS_LOG_PAYLOADS: %v", EnvPrefix, err)
+		}
+	}
+	if debugStr := os.Getenv(EnvPrefix + "DEBUG"); debugStr != "" {
+		if debug, err := strconv.ParseBool(debugStr); err == nil {
+			cfg.DebugLevel = debug
+		} else {
+			log.Printf("Warning: Invalid format for env var %sDEBUG: %v", EnvPrefix, err)
+		}
+	}
 }
 
 // applyFlags overwrites cfg fields if the corresponding flag was explicitly set on the command line
-func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, flagBackendWeights *string, flagHealthPath *string, flagInfoPath *string, flagHealthInterval *time.Duration, flagBackendTimeout *time.Duration, flagConfigFile *string, flagLBAlgo *string, flagEWMAAlpha *float64, flagAccessLogEnabled *bool, flagAccessLogPayloads *bool) {
+func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, flagBackendWeights *string, flagHealthPath *string, flagInfoPath *string, flagHealthInterval *time.Duration, flagBackendTimeout *time.Duration, flagConfigFile *string, flagLBAlgo *string, flagEWMAAlpha *float64, flagAccessLogEnabled *bool, flagAccessLogPayloads *bool, flagDebugLevel *bool) {
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "port":
@@ -210,6 +234,8 @@ func applyFlags(cfg *Config, flagProxyPort *string, flagBackendServers *string, 
 			cfg.AccessLogEnabled = *flagAccessLogEnabled
 		case "access-log-payloads":
 			cfg.AccessLogPayloads = *flagAccessLogPayloads
+		case "debug":
+			cfg.DebugLevel = *flagDebugLevel
 		}
 	})
 }

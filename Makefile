@@ -1,4 +1,4 @@
-golb: clean tidy fmt sec vet lint
+golb: clean tidy fmt sec vet test lint
 	mkdir dist ; go build -o dist/golb cmd/golb/main.go
 
 lint:
@@ -6,6 +6,9 @@ lint:
 
 sec:
 	go run github.com/securego/gosec/v2/cmd/gosec@latest -r .
+
+test:
+	go test -v ./...
 
 vet:
 	go vet ./...
